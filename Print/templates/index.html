@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>Print Service - ACM/ICPC @ WHU</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html {
+            position: relative;
+            min-height: 100%;
+        }
+
+        body {
+            margin-bottom: 60px;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            width: auto;
+            max-width: 680px;
+            padding: 0 15px;
+        }
+
+        .container .text-muted {
+            margin: 20px 0;
+        }
+
+        #printCode {
+            font-family: Monospace;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- Begin page content -->
+<div class="container">
+    <div class="page-header">
+        <h1>打印服务
+            <small>
+                {% if not logined %}
+                    <button type="button" class="btn btn-primary" disabled>(请登陆)
+                    </button>
+                {% else %}
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#printTaskModal">
+                        提交打印任务 (不超过 8192 字节)
+                    </button>
+                {% endif %}
+            </small>
+        </h1>
+        {% if logined %}
+        当前用户: {{ username }} ({{ teamname }})
+        {% endif %}
+    </div>
+    {% if not logined %}
+        <div class="form-inline">
+            <div class="form-group">
+                <input type="text" class="form-control" id="username" placeholder="User Name">
+            </div>
+            <div class="form-group">
+                <input type="password" class="form-control" id="password" placeholder="Password">
+            </div>
+            <button id="loginbtn" class="btn btn-default">登陆</button>
+            <span id="loginerror"></span>
+        </div>
+    {% endif %}
+    {% if logined %}
+        <!--<div class="alert alert-warning" role="alert">Print service will be shutted down 5 minutes before the contest ends.</div>-->
+        <table class="table">
+            <thead>
+            <tr>
+                <th class="col-xs-2">任务ID</th>
+                <th class="col-xs-5">提交时间</th>
+                <th class="col-xs-2">任务大小</th>
+                <th class="col-xs-3">任务状态</th>
+            </tr>
+            </thead>
+            <tbody id="printTasklist">
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+<footer class="footer">
+    <div class="container">
+        <p class="text-muted">&copy; 2017 Programming Contest Toolbox By WHU ACM/ICPC Team</p>
+    </div>
+</footer>
+
+<div class="modal fade bs-example-modal-lg" tabindex="-1" role="dialog" id="printTaskModal"
+     aria-labelledby="codeSubmissionModal">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form>
+                <textarea class="form-control" rows="15" placeholder="Your Code" id="printCode"></textarea>
+                <button type="button" class="btn btn-primary" id="printCodeSubmit">Print</button>
+                <span id="attention"></span>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/bootstrap.min.js"></script>
+<script>
+    var result = {
+        0: '<img src="/static/img/loading.gif" width="16px" height="16px">等待打印',
+        1: '<img src="/static/img/loading.gif" width="16px" height="16px">渲染...',
+        2: '<img src="/static/img/ok.png" width="16px" height="16px">已送至打印机',
+        3: '<img src="/static/img/loading.gif" width="16px" height="16px">Printing...(Usually requires 10-20 seconds)',
+        500: '<img src="/static/img/fail.png" width="16px" height="16px">Fail（Please Contact Us）',
+        501: '<img src="/static/img/fail.png" width="16px" height="16px">Rejected'
+    };
+    {% if logined %}
+        function getResult() {
+            $.get("./result.json", function (data) {
+                $("#printTasklist").html("");
+                data.data.forEach(function (data) {
+                    $("#printTasklist").append(
+                        '<tr>' +
+                        (data.status == 2 ?
+                            '<td style="font-family:monospace">' + data.uid.substr(0, 7) + '</td>' :
+                            '<td style="font-family:monospace">' + data.uid.substr(0, 7) + '</td>') +
+                        '<td>' + (new Date(Number(data.submit) * 1000).toLocaleString('zh-CN')) + '</td>' +
+                        '<td>' + data.len + ' Bytes</td>' +
+                        '<td>' + result[data.status] + '</td>' +
+                        '</tr>'
+                    );
+                });
+            })
+        }
+        $("#printCodeSubmit").on("click", function () {
+            var code = $("#printCode").val();
+            $("#printCodeSubmit").attr("disabled", true);
+            $.post("/print.json", {code: code}, function (data) {
+                console.log(data);
+                if (data.result !== 'success') {
+                    $("#attention").text(data.text);
+                } else {
+                    $("#attention").text("");
+                    $("#printCode").val("");
+                    $("#printTaskModal").modal('hide');
+                }
+                $("#printCodeSubmit").attr("disabled", false);
+            });
+        });
+        //getResult();
+        function f() {
+            getResult();
+            setTimeout(f, 3000);
+        }
+        f();
+    {% endif %}
+    $("#loginbtn").on("click", function () {
+        $.post("/login.json", {username: $("#username").val(), password: $("#password").val()}, function (data) {
+            if (data.result === 'success') {
+                document.cookie = "username=" + $("#username").val();
+                document.cookie = "password=" + $("#password").val();
+                window.location.reload();
+            } else {
+                $("#loginerror").text(data.text);
+            }
+        });
+    });
+</script>
+</body>
+</html>
